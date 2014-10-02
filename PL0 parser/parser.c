@@ -7,8 +7,6 @@
 #define FALSE 0
 #define TRUE 1
 
-//TODO : keyword 일떄 IDENTIFIER로 판단 X
-
 typedef enum
 {
 	TYPE_NONE = 0,
@@ -69,6 +67,17 @@ int isKeyWord(char * str)
 	return FALSE;
 }
 
+int isSpecialChar(char c)
+{
+	if( c == '+' || c == '-' || c == '*' ||	c == '/' || c == ',' || 
+		c == '=' || c == ';' || c == '.' || c == '(' || c == ')' ||
+		c == ':' || c == '>' || c == '<')
+	{
+		return TRUE;
+	}
+	return FALSE;
+}
+
 int NextToken()
 {
 	int tokenIndex = 0;
@@ -103,9 +112,7 @@ int NextToken()
 			type = TYPE_IDENTIFIER;
 		}
 	}
-	else if( ch == '+' || ch == '-' || ch == '*' ||	ch == '/' || ch == ',' || 
-		ch == '=' || ch == ';' || ch == '.' || ch == '(' || ch == ')' ||
-		ch == ':' || ch == '>' || ch == '<')
+	else if( isSpecialChar(ch) )
 	{
 		char before = ch;
 		token[0] = ch;
@@ -116,7 +123,6 @@ int NextToken()
 
 		if( before == ':' && ch == '=' )
 		{
-			// assign
 			token[1] = ch;
 			token[2] = '\0';
 			type = TYPE_ASSIGN;
@@ -125,7 +131,6 @@ int NextToken()
 		}
 		else if( before == '<' && ch == '=')
 		{
-			// LT
 			token[1] = ch;
 			token[2] = '\0';
 			type = TYPE_LESS_EQUAL;
@@ -134,7 +139,6 @@ int NextToken()
 		}
 		else if( before == '>' && ch == '=')
 		{
-			// GT
 			token[1] = ch;
 			token[2] = '\0';
 			type = TYPE_GREATER_EQUAL;
@@ -143,7 +147,6 @@ int NextToken()
 		}
 		else if( before == '<' && ch == '>')
 		{
-			// neq
 			token[1] = ch;
 			token[2] = '\0';
 			type = TYPE_NOT_EQUAL;
@@ -154,7 +157,8 @@ int NextToken()
 	}
 	else if(ch == EOF)
 	{
-		return -1;
+		return FALSE;
+		// error(0);
 	}
 
 	else
@@ -166,13 +170,14 @@ int NextToken()
 		ch = fgetc(fp);
 	}
 
-	printf("NOW token : %s\n", token);
+	printf("NEXT token : %s\n", token);
 
 	// eliminate white spaces
 	while( isspace(ch) ){ ch = fgetc(fp); }
-	return 0;
+	return TRUE;
 }
 
+// FWD decl
 void Expression();
 
 void Factor()
