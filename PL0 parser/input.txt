@@ -33,6 +33,7 @@ procedure gcd;
 		end;
 		z := f;
 	end;
+	
 begin
 	x := m; y := n; call multiply;
 	x := 25; y := 3; call divide;

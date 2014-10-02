@@ -4,6 +4,9 @@
 #include <ctype.h>
 //#include <stdbool.h>
 
+#define FALSE 0
+#define TRUE 1
+
 //TODO : keyword 일떄 IDENTIFIER로 판단 X
 
 typedef enum
@@ -13,6 +16,11 @@ typedef enum
 	TYPE_IDENTIFIER,
 	TYPE_KEYWORD,
 	TYPE_NUMBER,
+	
+	TYPE_ASSIGN,
+	TYPE_GREATER_EQUAL,
+	TYPE_LESS_EQUAL,
+	TYPE_NOT_EQUAL,
 
 	TYPE_PLUS = '+',
 	TYPE_MINUS = '-',
@@ -30,17 +38,14 @@ typedef enum
 	
 	TYPE_LPAREN = '(',
 	TYPE_RPAREN = ')',
-	
-	TYPE_ASSIGN,
-	TYPE_GREATER_EQUAL,
-	TYPE_LESS_EQUAL,
-	TYPE_NOT_EQUAL,
 
 	TYPE_OTHER,
 
 } TOKEN_TYPE;
 
-FILE *		fp;
+char keyWords[][10] = { "const", "var", "procedure", "call", "begin", "end", "if", "then", "while", "do", "odd"};
+
+FILE *		fp			= NULL;
 char		ch			= '\0';  // current char
 
 TOKEN_TYPE	type		= TYPE_NONE;
@@ -51,6 +56,17 @@ void error(int err)
 {
 	fprintf(stderr, "ERROR %d\n", err);
 	exit(-1);
+}
+
+int isKeyWord(char * str)
+{
+	int i = 0;
+	for(i = 0; i < sizeof(keyWords) / sizeof(char[10]); i++ )
+	{
+		if( strcmp(str, keyWords[i]) == 0 )
+			return TRUE;
+	}
+	return FALSE;
 }
 
 int NextToken()
@@ -77,7 +93,15 @@ int NextToken()
 			ch = fgetc(fp);
 		}
 		token[tokenIndex] = '\0';
-		type = TYPE_IDENTIFIER;
+
+		if(isKeyWord(token))
+		{
+			type = TYPE_KEYWORD;
+		}
+		else
+		{
+			type = TYPE_IDENTIFIER;
+		}
 	}
 	else if( ch == '+' || ch == '-' || ch == '*' ||	ch == '/' || ch == ',' || 
 		ch == '=' || ch == ';' || ch == '.' || ch == '(' || ch == ')' ||
@@ -142,7 +166,7 @@ int NextToken()
 		ch = fgetc(fp);
 	}
 
-	printf("NOW token %s\n", token);
+	printf("NOW token : %s\n", token);
 
 	// eliminate white spaces
 	while( isspace(ch) ){ ch = fgetc(fp); }
@@ -161,12 +185,12 @@ void Factor()
 		NextToken();
 	}
 
-	if( type == TYPE_NUMBER )
+	else if( type == TYPE_NUMBER )
 	{
 		NextToken();
 	}
 
-	if( type == TYPE_LPAREN )
+	else if( type == TYPE_LPAREN )
 	{
 		NextToken();
 		Expression();
@@ -220,6 +244,7 @@ void Condition()
 	else
 	{
 		Expression();
+
 		if( type != TYPE_EQUAL && 
 			type != TYPE_NOT_EQUAL &&
 			type != TYPE_LESS && 
@@ -254,7 +279,7 @@ void Statement()
 		}
 	}
 
-	if( strcmp("if", token) == 0 )
+	else if( strcmp("if", token) == 0 )
 	{
 		NextToken();
 		Condition();
@@ -269,7 +294,7 @@ void Statement()
 		Statement();
 	}
 
-	if( strcmp("begin", token) == 0 )
+	else if( strcmp("begin", token) == 0 )
 	{
 		do
 		{
@@ -286,7 +311,7 @@ void Statement()
 			error(17);
 	}
 
-	if( strcmp("while", token) == 0 )
+	else if( strcmp("while", token) == 0 )
 	{
 		NextToken();
 		Condition();
@@ -296,10 +321,11 @@ void Statement()
 		}
 		else
 			error(18);
+
 		Statement();
 	}
 
-	if( type == TYPE_IDENTIFIER )
+	else if( type == TYPE_IDENTIFIER )
 	{
 		// TODO : check if symbol alive
 
@@ -310,6 +336,8 @@ void Statement()
 		}
 		else
 			error(13);
+
+		Expression();
 	}
 }
 
@@ -366,6 +394,7 @@ void Block()
 		else
 			error(5);
 	}
+
 	if( strcmp(token, "var") == 0 )
 	{
 		do
@@ -381,7 +410,8 @@ void Block()
 		else
 			error(5);
 	}
-	if( strcmp(token, "procedure") == 0 )
+
+	while( strcmp(token, "procedure") == 0 )
 	{
 		NextToken();
 		if(type == TYPE_IDENTIFIER)
@@ -410,6 +440,7 @@ void Block()
 	}
 
 	Statement();
+	return ;
 }
 
 void SetUP()
@@ -430,39 +461,14 @@ int main()
 	}
 
 	{
+		/* main */
 		NextToken();
 		Block();
+
 		if( strcmp(".", token) != 0 )
 		{
 			error(9);
 		}
-
-		/* main */
-		/*
-		while( !(NextToken() < 0) )
-		{
-			printf("%s\t\t", token);
-
-			switch (type)
-			{
-			case TYPE_IDENTIFIER:
-				printf("IDENTIFIER\n");
-				break;
-			case TYPE_KEYWORD:
-				printf("KEY WORD\n");
-				break;
-			case TYPE_NUMBER:
-				printf("NUMBER\n");
-				break;
-			case TYPE_OTHER:
-				printf("OTHER\n");
-				break;
-			default:
-				printf("%c\n", type);
-				break;
-			}
-		}
-		*/
 	}
 
 	{
