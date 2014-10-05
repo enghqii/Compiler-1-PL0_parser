@@ -41,6 +41,26 @@ typedef enum
 
 } TOKEN_TYPE;
 
+typedef enum{
+	SYM_NONE,
+	SYM_CONST,
+	SYM_VAR,
+	SYM_PROCEDURE,
+} SYMBOL_TYPE;
+
+typedef struct{
+	char name[128];
+	SYMBOL_TYPE type;
+	//int level;
+} Symbol;
+
+typedef struct{
+	int n;
+	Symbol symtab[256];
+} SymbolTable;
+
+SymbolTable SYMTAB;
+
 char keyWords[][10] = { "const", "var", "procedure", "call", "begin", "end", "if", "then", "while", "do", "odd"};
 
 FILE *		fp			= NULL;
@@ -54,6 +74,31 @@ void error(int err)
 {
 	fprintf(stderr, "ERROR %d\n", err);
 	exit(-1);
+}
+
+int IsSymbol(SymbolTable SYMTAB, char * name)
+{
+	int i=0;
+	for(i = 0; i < SYMTAB.n; i++)
+	{
+		if(strcmp(SYMTAB.symtab[i].name, name) == 0)
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+void enter(SymbolTable SYMTAB, char * name, SYMBOL_TYPE type)
+{
+	if( IsSymbol(::SYMTAB, name) == FALSE ) 
+	{
+		Symbol s;
+		strcpy(s.name, name);
+		s.type = type;
+		::SYMTAB.symtab[SYMTAB.n] = s;
+		::SYMTAB.n++;
+	}
 }
 
 int isKeyWord(char * str)
@@ -452,6 +497,8 @@ void SetUP()
 {
 	fp = fopen("input.txt", "r");
 	while( isspace(ch = fgetc(fp)) ){}
+
+	SYMTAB.n = 0;
 }
 
 void CleanUP()
