@@ -48,13 +48,13 @@ typedef enum{
 	SYM_PROCEDURE,
 } SYMBOL_TYPE;
 
-typedef struct{
+typedef struct _Symbol{
 	char name[128];
 	SYMBOL_TYPE type;
 	//int level;
 } Symbol;
 
-typedef struct{
+typedef struct _SymbolTable{
 	int n;
 	Symbol symtab[256];
 } SymbolTable;
@@ -91,13 +91,13 @@ int IsSymbol(SymbolTable SYMTAB, char * name)
 
 void enter(SymbolTable SYMTAB, char * name, SYMBOL_TYPE type)
 {
-	if( IsSymbol(::SYMTAB, name) == FALSE ) 
+	if( IsSymbol(SYMTAB, name) == FALSE ) 
 	{
 		Symbol s;
 		strcpy(s.name, name);
 		s.type = type;
-		::SYMTAB.symtab[SYMTAB.n] = s;
-		::SYMTAB.n++;
+		SYMTAB.symtab[SYMTAB.n] = s;
+		SYMTAB.n++;
 	}
 }
 
@@ -402,6 +402,7 @@ void ConstDeclaration()
 			if( type == TYPE_NUMBER )
 			{
 				// SYMTAB ¿¡ insert
+				enter(SYMTAB, token, SYM_CONST);
 				NextToken();
 			}
 			else
@@ -420,6 +421,7 @@ void VarDeclaration()
 	if( type == TYPE_IDENTIFIER )
 	{
 		// TODO : enter
+		enter(SYMTAB, token, SYM_VAR);
 		NextToken();
 	}
 	else
@@ -467,6 +469,7 @@ void Block()
 		if(type == TYPE_IDENTIFIER)
 		{
 			// TODO : enter
+			enter(SYMTAB, token, SYM_PROCEDURE);
 			NextToken();
 		}
 		else
