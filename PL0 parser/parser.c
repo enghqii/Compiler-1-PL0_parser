@@ -7,6 +7,9 @@
 #define FALSE 0
 #define TRUE 1
 
+#define MAX_LEVEL 3		/* maximum depth of block nesting */
+#define MAX_CODE 200	/* size of code array */
+
 typedef enum
 {
 	TYPE_NONE = 0,
@@ -41,34 +44,84 @@ typedef enum
 
 } TOKEN_TYPE;
 
-typedef enum{
+char keyWords[][10] = { "const", "var", "procedure", "call", "begin", "end", "if", "then", "while", "do", "odd"};
+
+/* SYMTAB */
+typedef enum 
+{
 	SYM_NONE,
 	SYM_CONST,
 	SYM_VAR,
 	SYM_PROCEDURE,
 } SYMBOL_TYPE;
 
-typedef struct _Symbol{
+typedef struct _Symbol
+{
 	char name[128];
 	SYMBOL_TYPE type;
-	//int level;
+	int level;
+	int addr;
 } Symbol;
 
-typedef struct _SymbolTable{
-	int n;
+typedef struct _SymbolTable
+{
+	int tx;
 	Symbol symtab[256];
 } SymbolTable;
 
-SymbolTable SYMTAB;
+/* CODE */
+typedef enum
+{
+	LIT,
+	OPR,
+	LOD,
+	STO,
+	CAL,
+	INT,
+	JMP,
+	JPC,
+} Operator;
 
-char keyWords[][10] = { "const", "var", "procedure", "call", "begin", "end", "if", "then", "while", "do", "odd"};
+typedef struct _Instruction
+{
+	Operator	opcode;
+	int			level;
+	int			disp;
+} Instruction;
 
+typedef struct _Code
+{
+	int cx;							/* code allocation index */
+	Instruction inst[MAX_CODE];
+} Code;
+
+/* GLOBAL vars */
 FILE *		fp			= NULL;
-char		ch			= '\0';  // current char
+char		ch			= '\0';		/* current char */
 
 TOKEN_TYPE	type		= TYPE_NONE;
 char		token[128]	= "";
 int			num			= 0;
+
+SymbolTable	SYMTAB;
+Code		code;
+
+void gen(Operator opcode, int level, int disp)
+{
+	if(code.cx > MAX_CODE)
+	{
+		printf("Program is too long\n");
+		exit(-1);
+	}
+	else
+	{
+		code.inst[code.cx].opcode = opcode;
+		code.inst[code.cx].level = level;
+		code.inst[code.cx].disp = disp;
+
+		code.cx++;
+	}
+}
 
 void error(int err)
 {
@@ -79,7 +132,7 @@ void error(int err)
 int IsSymbol(SymbolTable SYMTAB, char * name)
 {
 	int i=0;
-	for(i = 0; i < SYMTAB.n; i++)
+	for(i = 0; i < SYMTAB.tx; i++)
 	{
 		if(strcmp(SYMTAB.symtab[i].name, name) == 0)
 		{
@@ -89,15 +142,15 @@ int IsSymbol(SymbolTable SYMTAB, char * name)
 	return FALSE;
 }
 
-void enter(SymbolTable SYMTAB, char * name, SYMBOL_TYPE type)
+void enter(SymbolTable SYMTAB, char * name, SYMBOL_TYPE type, int level)
 {
 	if( IsSymbol(SYMTAB, name) == FALSE ) 
 	{
 		Symbol s;
 		strcpy(s.name, name);
 		s.type = type;
-		SYMTAB.symtab[SYMTAB.n] = s;
-		SYMTAB.n++;
+		SYMTAB.symtab[SYMTAB.tx] = s;
+		SYMTAB.tx++;
 	}
 }
 
@@ -215,7 +268,7 @@ int NextToken()
 		ch = fgetc(fp);
 	}
 
-	printf("NEXT token : %s\n", token);
+	/*printf("NEXT token : %s\n", token);*/
 
 	// eliminate white spaces
 	while( isspace(ch) ){ ch = fgetc(fp); }
@@ -231,15 +284,19 @@ void Factor()
 
 	if( type == TYPE_IDENTIFIER )
 	{
-		// TODO
+
+		// if const then gen(lit);
+		// else if var gen(lod);
+		// else error(21);
+
+		gen(LOD, 0, 0);
 		NextToken();
 	}
-
 	else if( type == TYPE_NUMBER )
 	{
+		gen(LIT, 0, num);
 		NextToken();
 	}
-
 	else if( type == TYPE_LPAREN )
 	{
 		NextToken();
@@ -262,8 +319,19 @@ void Term()
 	Factor();
 	while( type == TYPE_MULTIPLY || type == TYPE_DIVIDE )
 	{
+		TOKEN_TYPE mulop = type;
+		
 		NextToken();
 		Factor();
+
+		if(mulop == TYPE_MULTIPLY)
+		{
+			gen(OPR, 0, 4);
+		}
+		else
+		{
+			gen(OPR, 0, 5);
+		}
 	}
 }
 
@@ -271,16 +339,34 @@ void Expression()
 {
 	if( type == TYPE_PLUS || type == TYPE_MINUS )
 	{
+		TOKEN_TYPE addop = type;
+
 		NextToken();
 		Term();
+
+		if(addop == TYPE_MINUS)
+		{
+			gen(OPR, 0, 1);
+		}
 	}
 	else
 		Term();
 
 	while( type == TYPE_PLUS || type == TYPE_MINUS )
 	{
+		TOKEN_TYPE addop = type;
+		
 		NextToken();
 		Term();
+
+		if(addop == TYPE_PLUS)
+		{
+			gen(OPR, 0, 2);
+		}
+		else
+		{
+			gen(OPR, 0, 3);
+		}
 	}
 }
 
@@ -290,6 +376,8 @@ void Condition()
 	{
 		NextToken();
 		Expression();
+
+		gen(OPR, 0, 6);
 	}
 	else
 	{
@@ -306,8 +394,32 @@ void Condition()
 		}
 		else
 		{
+			TOKEN_TYPE relop = type;
+			
 			NextToken();
 			Expression();
+
+			switch(relop)
+			{
+			case TYPE_EQUAL:
+				gen(OPR, 0, 8);
+				break;
+			case TYPE_NOT_EQUAL:
+				gen(OPR, 0, 9);
+				break;
+			case TYPE_LESS:
+				gen(OPR, 0, 10);
+				break;
+			case TYPE_GREATER_EQUAL:
+				gen(OPR, 0, 11);
+				break;
+			case TYPE_GREATER:
+				gen(OPR, 0, 12);
+				break;
+			case TYPE_LESS_EQUAL:
+				gen(OPR, 0, 13);
+				break;
+			}
 		}
 	}
 }
@@ -325,12 +437,17 @@ void Statement()
 		else
 		{
 			// TODO : check if symbol alive
+			// and if it is 'procedure' then
+			gen(CAL, 0, 0);
+			// else error(15);
 			NextToken();
 		}
 	}
 
 	else if( strcmp("if", token) == 0 )
 	{
+		int cx1;
+
 		NextToken();
 		Condition();
 
@@ -340,6 +457,9 @@ void Statement()
 		}
 		else
 			error(16);
+
+		cx1 = code.cx;
+		gen(JPC, 0, 0);
 
 		Statement();
 	}
@@ -363,8 +483,15 @@ void Statement()
 
 	else if( strcmp("while", token) == 0 )
 	{
+		int cx1 = code.cx;
+		int cx2;
+
 		NextToken();
 		Condition();
+
+		cx2 = code.cx;
+		gen(JPC, 0, 0);
+
 		if( strcmp("do", token) == 0 )
 		{
 			NextToken();
@@ -373,6 +500,8 @@ void Statement()
 			error(18);
 
 		Statement();
+		gen(JMP, 0, cx1);
+		code.inst[cx2].disp = code.cx;
 	}
 
 	else if( type == TYPE_IDENTIFIER )
@@ -388,6 +517,9 @@ void Statement()
 			error(13);
 
 		Expression();
+
+		// if the symbol alive
+		gen(STO, 0, 0);
 	}
 }
 
@@ -402,7 +534,7 @@ void ConstDeclaration()
 			if( type == TYPE_NUMBER )
 			{
 				// SYMTAB ¿¡ insert
-				enter(SYMTAB, token, SYM_CONST);
+				enter(SYMTAB, token, SYM_CONST, 0);
 				NextToken();
 			}
 			else
@@ -421,7 +553,7 @@ void VarDeclaration()
 	if( type == TYPE_IDENTIFIER )
 	{
 		// TODO : enter
-		enter(SYMTAB, token, SYM_VAR);
+		enter(SYMTAB, token, SYM_VAR, 0);
 		NextToken();
 	}
 	else
@@ -430,6 +562,13 @@ void VarDeclaration()
 
 void Block()
 {
+	int cx0;
+	int dx = 3;
+	int tx0 = SYMTAB.tx;
+
+	SYMTAB.symtab[SYMTAB.tx].addr = code.cx;
+	gen(JMP, 0, 0);
+
 	if( strcmp(token, "const") == 0 )
 	{
 		do
@@ -468,8 +607,7 @@ void Block()
 		NextToken();
 		if(type == TYPE_IDENTIFIER)
 		{
-			// TODO : enter
-			enter(SYMTAB, token, SYM_PROCEDURE);
+			enter(SYMTAB, token, SYM_PROCEDURE, 0);
 			NextToken();
 		}
 		else
@@ -492,7 +630,13 @@ void Block()
 			error(5);
 	}
 
+	code.inst[SYMTAB.symtab[tx0].addr].disp = code.cx;
+	SYMTAB.symtab[tx0].addr = code.cx;
+
+	cx0 = code.cx;
 	Statement();
+	gen(OPR, 0, 0);
+
 	return ;
 }
 
@@ -501,7 +645,8 @@ void SetUP()
 	fp = fopen("input.txt", "r");
 	while( isspace(ch = fgetc(fp)) ){}
 
-	SYMTAB.n = 0;
+	SYMTAB.tx	= 0;
+	code.cx		= 0;
 }
 
 void CleanUP()
@@ -524,6 +669,8 @@ int main()
 		{
 			error(9);
 		}
+
+		printf("NO Error found\n");
 	}
 
 	{
