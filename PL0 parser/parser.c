@@ -183,22 +183,22 @@ void error(int err) {
 	exit(-1);
 }
 
-int IsSymbol(SymbolTable SYMTAB, char * name) {
+int FindSymbol(char * name) {
 
-	int i=0;
-	for(i = 0; i < SYMTAB.tx; i++) 	{
+	int i = 0;
+	for(i = SYMTAB.tx - 1; i >= 0; i--) 	{
 		if(strcmp(SYMTAB.symtab[i].name, name) == 0) {
-			return TRUE;
+			return i;
 		}
 	}
-	return FALSE;
+	return -1;
 }
 
 void enter(char * name, SYMBOL_TYPE type, int addr) {
 
 	printf("enter : [%s]\n", name);
 
-	if( IsSymbol(SYMTAB, name) == FALSE ) {
+	if( FindSymbol(name) < 0 ) {
 		Symbol s;
 
 		strcpy(s.name, name);
@@ -331,11 +331,25 @@ void Factor() {
 
 	if( type == TYPE_IDENTIFIER ) {
 
-		// if const then gen(lit);
-		// else if var gen(lod);
-		// else error(21);
+		int index = FindSymbol(token);
+		if( index >= 0 ){
 
-		gen(LOD, 0, 0);
+			switch (SYMTAB.symtab[index].type){
+
+			case SYM_CONST :
+				gen(LIT, 0, SYMTAB.symtab[index].addr);
+				break;
+			case SYM_VAR :
+				gen(LOD, lev - SYMTAB.symtab[index].level, SYMTAB.symtab[index].addr);
+				break;
+			default:
+				error(21);
+			}
+
+		}else{
+			error(21);
+		}
+
 		NextToken();
 	} else if( type == TYPE_NUMBER ) {
 		gen(LIT, 0, num);
@@ -453,10 +467,16 @@ void Statement() {
 		if(type != TYPE_IDENTIFIER ) {
 			error(14);
 		} else {
-			// TODO : check if symbol alive
-			// and if it is 'procedure' then
-			gen(CAL, 0, 0);
-			// else error(15);
+
+			int index = FindSymbol(token);
+			if(index >= 0 && SYMTAB.symtab[index].type == SYM_PROCEDURE){
+				
+				gen(CAL, lev - SYMTAB.symtab[index].level, SYMTAB.symtab[index].addr);
+
+			}else{
+				error(15);
+			}
+
 			NextToken();
 		}
 	} else if( strcmp("if", token) == 0 ) {
@@ -510,6 +530,17 @@ void Statement() {
 	
 	} else if( type == TYPE_IDENTIFIER ) {
 		// TODO : check if symbol alive
+		int index = FindSymbol(token);
+
+		if(index < 0) {
+			error(11);
+
+		} else {
+
+			if(SYMTAB.symtab[index].type != SYM_VAR) {
+				error(12);
+			}
+		}
 
 		NextToken();
 		if( type == TYPE_ASSIGN ) {
@@ -520,8 +551,9 @@ void Statement() {
 
 		Expression();
 
-		// if the symbol alive
-		gen(STO, 0, 0);
+		if(index >= 0){
+			gen(STO, lev - SYMTAB.symtab[index].level, SYMTAB.symtab[index].addr);
+		}
 	}
 }
 
@@ -653,6 +685,9 @@ void CleanUP() {
 void printCode() {
 
 	int i = 0;
+
+	printf("<CODE>\n");
+
 	for(i = 0; i < code.cx; i++) {
 
 		switch(code.inst[i].opcode){
