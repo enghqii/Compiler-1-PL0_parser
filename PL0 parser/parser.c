@@ -10,8 +10,8 @@
 #define MAX_LEVEL 3		/* maximum depth of block nesting */
 #define MAX_CODE 200	/* size of code array */
 
-typedef enum
-{
+typedef enum {
+
 	TYPE_NONE = 0,
 
 	TYPE_IDENTIFIER,
@@ -47,18 +47,16 @@ typedef enum
 char keyWords[][10] = { "const", "var", "procedure", "call", "begin", "end", "if", "then", "while", "do", "odd"};
 
 /* SYMTAB */
-typedef enum 
-{
+typedef enum {
 	SYM_NONE,
 	SYM_CONST,
 	SYM_VAR,
 	SYM_PROCEDURE,
 } SYMBOL_TYPE;
 
-char* get_type_string(SYMBOL_TYPE type)
-{
-	switch (type)
-	{
+char* get_type_string(SYMBOL_TYPE type) {
+
+	switch (type) {
 	case SYM_NONE:
 		return "NONE";
 	case SYM_CONST:
@@ -72,23 +70,20 @@ char* get_type_string(SYMBOL_TYPE type)
 	}
 }
 
-typedef struct _Symbol
-{
+typedef struct _Symbol {
 	char name[128];
 	SYMBOL_TYPE type;
 	int level;
 	int addr;
 } Symbol;
 
-typedef struct _SymbolTable
-{
+typedef struct _SymbolTable {
 	int tx;
 	Symbol symtab[256];
 } SymbolTable;
 
 /* CODE */
-typedef enum
-{
+typedef enum {
 	LIT,
 	OPR,
 	LOD,
@@ -99,15 +94,13 @@ typedef enum
 	JPC,
 } Operator;
 
-typedef struct _Instruction
-{
+typedef struct _Instruction {
 	Operator	opcode;
 	int			level;
 	int			disp;
 } Instruction;
 
-typedef struct _Code
-{
+typedef struct _Code {
 	int cx;							/* code allocation index */
 	Instruction inst[MAX_CODE];
 } Code;
@@ -120,20 +113,62 @@ TOKEN_TYPE	type		= TYPE_NONE;
 char		token[128]	= "";
 int			num			= 0;
 
-int	lev = 0;
-
 SymbolTable	SYMTAB;
 Code		code;
 
-void gen(Operator opcode, int level, int disp)
-{
-	if(code.cx > MAX_CODE)
+int			lev = 0;
+
+/* code generation functions */
+
+void print_symboltable() {
+
+	int i=0;
+	
+	
+	printf("\n=========================\n");
+	printf("<SYMTAB>\n");
+	printf("name | type | level | addr\n");
+
+	for(i = 0; i < SYMTAB.tx; i++)
 	{
+		printf("%5s %6s %7d %d\n",
+		SYMTAB.symtab[i].name,
+		get_type_string(SYMTAB.symtab[i].type),
+		SYMTAB.symtab[i].level,
+		SYMTAB.symtab[i].addr
+		);
+	}
+
+	printf("=========================\n");
+}
+
+void level_up() {
+	lev ++;
+}
+
+void level_down() {
+
+	{
+		int i;
+		for(i = SYMTAB.tx - 1; i >= 0; i--){
+			if(SYMTAB.symtab[i].level < lev)
+				break;
+		}
+
+		SYMTAB.tx = i + 1;
+	}
+
+	print_symboltable();
+	lev --;
+}
+
+void gen(Operator opcode, int level, int disp) {
+
+	if(code.cx > MAX_CODE) {
 		printf("Program is too long\n");
 		exit(-1);
-	}
-	else
-	{
+
+	} else {
 		code.inst[code.cx].opcode = opcode;
 		code.inst[code.cx].level = level;
 		code.inst[code.cx].disp = disp;
@@ -142,101 +177,88 @@ void gen(Operator opcode, int level, int disp)
 	}
 }
 
-void error(int err)
-{
+void error(int err) {
 	fprintf(stderr, "ERROR %d\n", err);
 	exit(-1);
 }
 
-int IsSymbol(SymbolTable SYMTAB, char * name)
-{
+int IsSymbol(SymbolTable SYMTAB, char * name) {
+
 	int i=0;
-	for(i = 0; i < SYMTAB.tx; i++)
-	{
-		if(strcmp(SYMTAB.symtab[i].name, name) == 0)
-		{
+	for(i = 0; i < SYMTAB.tx; i++) 	{
+		if(strcmp(SYMTAB.symtab[i].name, name) == 0) {
 			return TRUE;
 		}
 	}
 	return FALSE;
 }
 
-void enter(char * name, SYMBOL_TYPE type, int level)
-{
-	printf("enter : [%s]\n", name);
+void enter(char * name, SYMBOL_TYPE type, int addr) {
 
-	if( IsSymbol(SYMTAB, name) == FALSE ) 
-	{
+	printf("enter : [%s]\n", name);
+	if( IsSymbol(SYMTAB, name) == FALSE ) {
 		Symbol s;
 
 		strcpy(s.name, name);
-		s.type = type;
+		s.type	= type;
 		s.level = lev;
-		s.addr = 0;
+		s.addr	= addr;
 		
 		SYMTAB.symtab[SYMTAB.tx] = s;
 		SYMTAB.tx++;
 	}
 }
 
-int isKeyWord(char * str)
-{
+// Tokenising functions 
+
+int isKeyWord(char * str) {
 	int i = 0;
-	for(i = 0; i < sizeof(keyWords) / sizeof(char[10]); i++ )
-	{
+	for(i = 0; i < sizeof(keyWords) / sizeof(char[10]); i++ ) {
 		if( strcmp(str, keyWords[i]) == 0 )
 			return TRUE;
 	}
 	return FALSE;
 }
 
-int isSpecialChar(char c)
-{
+int isSpecialChar(char c) {
 	if( c == '+' || c == '-' || c == '*' ||	c == '/' || c == ',' || 
 		c == '=' || c == ';' || c == '.' || c == '(' || c == ')' ||
-		c == ':' || c == '>' || c == '<')
-	{
+		c == ':' || c == '>' || c == '<') {
 		return TRUE;
 	}
 	return FALSE;
 }
 
-int NextToken()
-{
+int NextToken() {
+
 	int tokenIndex = 0;
 	token[0] = '\0';
 
-	if( isdigit(ch) )
-	{
-		while( isdigit(ch) )
-		{
+	if( isdigit(ch) ) {
+		while( isdigit(ch) ) {
 			token[tokenIndex++] = ch;
 			ch = fgetc(fp);
 		}
 		token[tokenIndex] = '\0';
 		num = atoi(token);
 		type = TYPE_NUMBER;
-	}
-	else if( isalpha(ch) )
-	{
-		while( isalpha(ch) || isdigit(ch) )
-		{
+
+	} else if( isalpha(ch) ) {
+
+		while( isalpha(ch) || isdigit(ch) ) {
 			token[tokenIndex++] = ch;
 			ch = fgetc(fp);
 		}
 		token[tokenIndex] = '\0';
 
-		if(isKeyWord(token))
-		{
+		if(isKeyWord(token)) {
 			type = TYPE_KEYWORD;
 		}
-		else
-		{
+		else {
 			type = TYPE_IDENTIFIER;
 		}
-	}
-	else if( isSpecialChar(ch) )
-	{
+
+	} else if( isSpecialChar(ch) ) {
 		char before = ch;
 		token[0] = ch;
 		token[1] = '\0';
@@ -244,48 +266,35 @@ int NextToken()
 
 		ch = fgetc(fp);
 
-		if( before == ':' && ch == '=' )
-		{
+		if( before == ':' && ch == '=' ) {
 			token[1] = ch;
 			token[2] = '\0';
 			type = TYPE_ASSIGN;
-
 			ch = fgetc(fp);
-		}
-		else if( before == '<' && ch == '=')
-		{
+
+		} else if( before == '<' && ch == '=') {
 			token[1] = ch;
 			token[2] = '\0';
 			type = TYPE_LESS_EQUAL;
-
 			ch = fgetc(fp);
-		}
-		else if( before == '>' && ch == '=')
-		{
+
+		} else if( before == '>' && ch == '=') {
 			token[1] = ch;
 			token[2] = '\0';
 			type = TYPE_GREATER_EQUAL;
-
 			ch = fgetc(fp);
 		}
-		else if( before == '<' && ch == '>')
-		{
+		else if( before == '<' && ch == '>') {
 			token[1] = ch;
 			token[2] = '\0';
 			type = TYPE_NOT_EQUAL;
-
 			ch = fgetc(fp);
 		}
 
-	}
-	else if(ch == EOF)
-	{
+	} else if(ch == EOF) {
 		return FALSE;
-		// error(0);
-	}
 
-	else
-	{
+	} else {
 		// A char i can't parse
 		printf("CH : %d(%c)\n", ch, ch);
 		type = TYPE_NONE;
@@ -300,15 +309,14 @@ int NextToken()
 	return TRUE;
 }
 
-// FWD decl
+/* Parsing functions */
+
 void Expression();
 
-void Factor()
-{
+void Factor() {
 	int i = 0;
 
-	if( type == TYPE_IDENTIFIER )
-	{
+	if( type == TYPE_IDENTIFIER ) {
 
 		// if const then gen(lit);
 		// else if var gen(lod);
@@ -316,96 +324,75 @@ void Factor()
 
 		gen(LOD, 0, 0);
 		NextToken();
-	}
-	else if( type == TYPE_NUMBER )
-	{
+	} else if( type == TYPE_NUMBER ) {
 		gen(LIT, 0, num);
 		NextToken();
-	}
-	else if( type == TYPE_LPAREN )
-	{
+	} else if( type == TYPE_LPAREN ) {
 		NextToken();
 		Expression();
 
-		if( type == TYPE_RPAREN )
-		{
+		if( type == TYPE_RPAREN ) {
 			NextToken();
-		}
-		else
+		} else {
 			error(22);
-	}
-	else
+		}
+	} else {
 		error(23);
-
+	}
 }
 
-void Term()
-{
+void Term() {
 	Factor();
-	while( type == TYPE_MULTIPLY || type == TYPE_DIVIDE )
-	{
+	while( type == TYPE_MULTIPLY || type == TYPE_DIVIDE ) {
 		TOKEN_TYPE mulop = type;
 		
 		NextToken();
 		Factor();
 
-		if(mulop == TYPE_MULTIPLY)
-		{
+		if(mulop == TYPE_MULTIPLY) {
 			gen(OPR, 0, 4);
-		}
-		else
-		{
+		} else {
 			gen(OPR, 0, 5);
 		}
 	}
 }
 
-void Expression()
-{
-	if( type == TYPE_PLUS || type == TYPE_MINUS )
-	{
+void Expression() {
+
+	if( type == TYPE_PLUS || type == TYPE_MINUS ) {
 		TOKEN_TYPE addop = type;
 
 		NextToken();
 		Term();
 
-		if(addop == TYPE_MINUS)
-		{
+		if(addop == TYPE_MINUS) {
 			gen(OPR, 0, 1);
 		}
-	}
-	else
+	} else {
 		Term();
+	}
 
-	while( type == TYPE_PLUS || type == TYPE_MINUS )
-	{
+	while( type == TYPE_PLUS || type == TYPE_MINUS ) {
 		TOKEN_TYPE addop = type;
 		
 		NextToken();
 		Term();
 
-		if(addop == TYPE_PLUS)
-		{
+		if(addop == TYPE_PLUS) {
 			gen(OPR, 0, 2);
-		}
-		else
-		{
+		} else {
 			gen(OPR, 0, 3);
 		}
 	}
 }
 
-void Condition()
-{
-	if( strcmp("odd", token) == 0 )
-	{
+void Condition() {
+	if( strcmp("odd", token) == 0 ) {
 		NextToken();
 		Expression();
 
 		gen(OPR, 0, 6);
-	}
-	else
-	{
+	} else {
 		Expression();
 
 		if( type != TYPE_EQUAL && 
@@ -413,19 +400,15 @@ void Condition()
 			type != TYPE_LESS && 
 			type != TYPE_LESS_EQUAL && 
 			type != TYPE_GREATER && 
-			type != TYPE_GREATER_EQUAL )
-		{
+			type != TYPE_GREATER_EQUAL ) {
 			error(20);
-		}
-		else
-		{
+		} else {
 			TOKEN_TYPE relop = type;
 			
 			NextToken();
 			Expression();
 
-			switch(relop)
-			{
+			switch(relop) {
 			case TYPE_EQUAL:
 				gen(OPR, 0, 8);
 				break;
@@ -449,65 +432,50 @@ void Condition()
 	}
 }
 
-void Statement()
-{
-	if( strcmp("call", token) == 0 )
-	{
+void Statement() {
+
+	if( strcmp("call", token) == 0 ) {
 		NextToken();
 
-		if(type != TYPE_IDENTIFIER )
-		{
+		if(type != TYPE_IDENTIFIER ) {
 			error(14);
-		}
-		else
-		{
+		} else {
 			// TODO : check if symbol alive
 			// and if it is 'procedure' then
 			gen(CAL, 0, 0);
 			// else error(15);
 			NextToken();
 		}
-	}
-
-	else if( strcmp("if", token) == 0 )
-	{
+	} else if( strcmp("if", token) == 0 ) {
 		int cx1;
 
 		NextToken();
 		Condition();
 
-		if( strcmp(token, "then") == 0 )
-		{
+		if( strcmp(token, "then") == 0 ) {
 			NextToken();
-		}
-		else
+		} else {
 			error(16);
+		}
 
 		cx1 = code.cx;
 		gen(JPC, 0, 0);
 
 		Statement();
-	}
 
-	else if( strcmp("begin", token) == 0 )
-	{
-		do
-		{
+	} else if( strcmp("begin", token) == 0 ) {
+		do {
 			NextToken();
 			Statement();
-		}
-		while(type == TYPE_SEMICOLON);
+		} while(type == TYPE_SEMICOLON);
 
-		if( strcmp("end", token) == 0 )
-		{
+		if( strcmp("end", token) == 0 ) {
 			NextToken();
-		}
-		else
+		} else {
 			error(17);
-	}
-
-	else if( strcmp("while", token) == 0 )
-	{
+		}
+		
+	} else if( strcmp("while", token) == 0 ) {
 		int cx1 = code.cx;
 		int cx2;
 
@@ -517,29 +485,25 @@ void Statement()
 		cx2 = code.cx;
 		gen(JPC, 0, 0);
 
-		if( strcmp("do", token) == 0 )
-		{
+		if( strcmp("do", token) == 0 ) {
 			NextToken();
-		}
-		else
+		} else {
 			error(18);
+		}
 
 		Statement();
 		gen(JMP, 0, cx1);
 		code.inst[cx2].disp = code.cx;
-	}
-
-	else if( type == TYPE_IDENTIFIER )
-	{
+	
+	} else if( type == TYPE_IDENTIFIER ) {
 		// TODO : check if symbol alive
 
 		NextToken();
-		if( type == TYPE_ASSIGN )
-		{
+		if( type == TYPE_ASSIGN ) {
 			NextToken();
-		}
-		else
+		} else {
 			error(13);
+		}
 
 		Expression();
 
@@ -548,113 +512,101 @@ void Statement()
 	}
 }
 
-void ConstDeclaration()
-{
-	if( type == TYPE_IDENTIFIER )
-	{
+void ConstDeclaration() {
+
+	if( type == TYPE_IDENTIFIER ) {
+		char const_name[64];
+		strcpy(const_name, token);
+
 		NextToken();
-		if( type == TYPE_EQUAL )
-		{
+		if( type == TYPE_EQUAL ) {
 			NextToken();
-			if( type == TYPE_NUMBER )
-			{
+			if( type == TYPE_NUMBER ) {
 				// SYMTAB ¿¡ insert
-				enter(token, SYM_CONST, 0);
+				enter(const_name, SYM_CONST, num);
 				NextToken();
-			}
-			else
+			} else {
 				error(2);
-		}
-		else
+			}
+		} else{
 			error(3);
-	}
-	else
+		}
+	} else {
 		error(4);
-
+	}
 }
 
-void VarDeclaration()
-{
-	if( type == TYPE_IDENTIFIER )
-	{
+void VarDeclaration() {
+
+	if( type == TYPE_IDENTIFIER ) {
 		// TODO : enter
-		enter(token, SYM_VAR, 0);
+		enter(token, SYM_VAR, -1);
 		NextToken();
-	}
-	else
+	} else {
 		error(4);
+	}
 }
 
-void Block()
-{
+void Block() {
 	int cx0;
 	int dx = 3;
 	int tx0 = SYMTAB.tx;
 
-	lev++;
+	level_up();
 
 	SYMTAB.symtab[SYMTAB.tx].addr = code.cx;
 	gen(JMP, 0, 0);
 
-	if( strcmp(token, "const") == 0 )
-	{
-		do
-		{
+	if( strcmp(token, "const") == 0 ) {
+		do {
 			NextToken();
 			ConstDeclaration();
-		}
-		while( type == TYPE_COMMA );
+		} while( type == TYPE_COMMA );
 
-		if( type == TYPE_SEMICOLON )
-		{
+		if( type == TYPE_SEMICOLON ) {
 			NextToken();
 		}
-		else
+		else {
 			error(5);
+		}
 	}
 
-	if( strcmp(token, "var") == 0 )
-	{
-		do
-		{
+	if( strcmp(token, "var") == 0 ) {
+		do {
 			NextToken();
 			VarDeclaration();
-		}while( type == TYPE_COMMA );
+		} while( type == TYPE_COMMA );
 
-		if( type == TYPE_SEMICOLON )
-		{
+		if( type == TYPE_SEMICOLON ) {
 			NextToken();
-		}
-		else
+		} else {
 			error(5);
+		}
 	}
 
-	while( strcmp(token, "procedure") == 0 )
-	{
-		NextToken();
-		if(type == TYPE_IDENTIFIER)
-		{
-			enter(token, SYM_PROCEDURE, 0);
-			NextToken();
-		}
-		else
-			error(4);
+	while( strcmp(token, "procedure") == 0 ) {
 
-		if( type == TYPE_SEMICOLON )
-		{
+		NextToken();
+		if(type == TYPE_IDENTIFIER) {
+			enter(token, SYM_PROCEDURE, -1);
 			NextToken();
+		} else {
+			error(4);
 		}
-		else
+
+		if( type == TYPE_SEMICOLON ) {
+			NextToken();
+		} else {
 			error(5);
+		}
 
 		Block();
 		
-		if( type == TYPE_SEMICOLON )
-		{
+		if( type == TYPE_SEMICOLON ) {
 			NextToken();
-		}
-		else
+		} else {
 			error(5);
+		}
 	}
 
 	code.inst[SYMTAB.symtab[tx0].addr].disp = code.cx;
@@ -664,13 +616,15 @@ void Block()
 	Statement();
 	gen(OPR, 0, 0);
 
-	lev--;
+	level_down();
 
 	return ;
 }
 
-void SetUP()
-{
+/* and other functions */
+
+void SetUP() {
+
 	fp = fopen("input.txt", "r");
 	while( isspace(ch = fgetc(fp)) ){}
 
@@ -678,40 +632,21 @@ void SetUP()
 	code.cx		= 0;
 }
 
-void CleanUP()
-{
+void CleanUP() {
+
 	fclose(fp);
 }
 
-void print_symboltable()
-{
-	int i=0;
-	
-	printf("SYMTAB\n");
-	printf("name | type | level | addr\n");
+void printCode() {
 
-	for(i = 0; i < SYMTAB.tx; i++)
-	{
-		printf("%5s %6s %7d %d\n",
-		SYMTAB.symtab[i].name,
-		get_type_string(SYMTAB.symtab[i].type),
-		SYMTAB.symtab[i].level,
-		SYMTAB.symtab[i].addr
-		);
-	}
-}
-
-void printCode()
-{
 	int i = 0;
-	for(i = 0; i < code.cx; i++)
-	{
+	for(i = 0; i < code.cx; i++) {
 
 	}
 }
 
-int main()
-{
+int main() {
+	
 	{
 		SetUP();
 	}
@@ -722,8 +657,7 @@ int main()
 		lev = -1;
 		Block();
 
-		if( strcmp(".", token) != 0 )
-		{
+		if( strcmp(".", token) != 0 ) {
 			error(9);
 		}
 
