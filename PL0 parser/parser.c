@@ -55,6 +55,23 @@ typedef enum
 	SYM_PROCEDURE,
 } SYMBOL_TYPE;
 
+char* get_type_string(SYMBOL_TYPE type)
+{
+	switch (type)
+	{
+	case SYM_NONE:
+		return "NONE";
+	case SYM_CONST:
+		return "CONST";
+	case SYM_VAR:
+		return "VAR";
+	case SYM_PROCEDURE:
+		return "PROC";
+	default:
+		return "";
+	}
+}
+
 typedef struct _Symbol
 {
 	char name[128];
@@ -103,6 +120,8 @@ TOKEN_TYPE	type		= TYPE_NONE;
 char		token[128]	= "";
 int			num			= 0;
 
+int	lev = 0;
+
 SymbolTable	SYMTAB;
 Code		code;
 
@@ -142,13 +161,19 @@ int IsSymbol(SymbolTable SYMTAB, char * name)
 	return FALSE;
 }
 
-void enter(SymbolTable SYMTAB, char * name, SYMBOL_TYPE type, int level)
+void enter(char * name, SYMBOL_TYPE type, int level)
 {
+	printf("enter : [%s]\n", name);
+
 	if( IsSymbol(SYMTAB, name) == FALSE ) 
 	{
 		Symbol s;
+
 		strcpy(s.name, name);
 		s.type = type;
+		s.level = lev;
+		s.addr = 0;
+		
 		SYMTAB.symtab[SYMTAB.tx] = s;
 		SYMTAB.tx++;
 	}
@@ -534,7 +559,7 @@ void ConstDeclaration()
 			if( type == TYPE_NUMBER )
 			{
 				// SYMTAB ¿¡ insert
-				enter(SYMTAB, token, SYM_CONST, 0);
+				enter(token, SYM_CONST, 0);
 				NextToken();
 			}
 			else
@@ -553,7 +578,7 @@ void VarDeclaration()
 	if( type == TYPE_IDENTIFIER )
 	{
 		// TODO : enter
-		enter(SYMTAB, token, SYM_VAR, 0);
+		enter(token, SYM_VAR, 0);
 		NextToken();
 	}
 	else
@@ -565,6 +590,8 @@ void Block()
 	int cx0;
 	int dx = 3;
 	int tx0 = SYMTAB.tx;
+
+	lev++;
 
 	SYMTAB.symtab[SYMTAB.tx].addr = code.cx;
 	gen(JMP, 0, 0);
@@ -607,7 +634,7 @@ void Block()
 		NextToken();
 		if(type == TYPE_IDENTIFIER)
 		{
-			enter(SYMTAB, token, SYM_PROCEDURE, 0);
+			enter(token, SYM_PROCEDURE, 0);
 			NextToken();
 		}
 		else
@@ -637,6 +664,8 @@ void Block()
 	Statement();
 	gen(OPR, 0, 0);
 
+	lev--;
+
 	return ;
 }
 
@@ -654,6 +683,33 @@ void CleanUP()
 	fclose(fp);
 }
 
+void print_symboltable()
+{
+	int i=0;
+	
+	printf("SYMTAB\n");
+	printf("name | type | level | addr\n");
+
+	for(i = 0; i < SYMTAB.tx; i++)
+	{
+		printf("%5s %6s %7d %d\n",
+		SYMTAB.symtab[i].name,
+		get_type_string(SYMTAB.symtab[i].type),
+		SYMTAB.symtab[i].level,
+		SYMTAB.symtab[i].addr
+		);
+	}
+}
+
+void printCode()
+{
+	int i = 0;
+	for(i = 0; i < code.cx; i++)
+	{
+
+	}
+}
+
 int main()
 {
 	{
@@ -663,6 +719,7 @@ int main()
 	{
 		/* main */
 		NextToken();
+		lev = -1;
 		Block();
 
 		if( strcmp(".", token) != 0 )
@@ -671,6 +728,7 @@ int main()
 		}
 
 		printf("NO Error found\n");
+		print_symboltable();
 	}
 
 	{
