@@ -84,7 +84,7 @@ typedef struct _SymbolTable {
 
 /* CODE */
 typedef enum {
-	LIT,
+	LIT = 0,
 	OPR,
 	LOD,
 	STO,
@@ -147,6 +147,8 @@ void level_up() {
 }
 
 void level_down() {
+	
+	print_symboltable();
 
 	{
 		int i;
@@ -158,7 +160,6 @@ void level_down() {
 		SYMTAB.tx = i + 1;
 	}
 
-	print_symboltable();
 	lev --;
 }
 
@@ -196,6 +197,7 @@ int IsSymbol(SymbolTable SYMTAB, char * name) {
 void enter(char * name, SYMBOL_TYPE type, int addr) {
 
 	printf("enter : [%s]\n", name);
+
 	if( IsSymbol(SYMTAB, name) == FALSE ) {
 		Symbol s;
 
@@ -203,6 +205,17 @@ void enter(char * name, SYMBOL_TYPE type, int addr) {
 		s.type	= type;
 		s.level = lev;
 		s.addr	= addr;
+		
+		if(type == SYM_VAR) {
+
+			Symbol before = SYMTAB.symtab[SYMTAB.tx - 1];
+
+			if(before.type == SYM_VAR){
+				s.addr = before.addr + 1;
+			}else{
+				s.addr = 0;
+			}
+		}
 		
 		SYMTAB.symtab[SYMTAB.tx] = s;
 		SYMTAB.tx++;
@@ -554,7 +567,7 @@ void Block() {
 
 	level_up();
 
-	SYMTAB.symtab[SYMTAB.tx].addr = code.cx;
+	//SYMTAB.symtab[SYMTAB.tx].addr = code.cx;
 	gen(JMP, 0, 0);
 
 	if( strcmp(token, "const") == 0 ) {
@@ -610,7 +623,7 @@ void Block() {
 	}
 
 	code.inst[SYMTAB.symtab[tx0].addr].disp = code.cx;
-	SYMTAB.symtab[tx0].addr = code.cx;
+	//SYMTAB.symtab[tx0].addr = code.cx;
 
 	cx0 = code.cx;
 	Statement();
@@ -642,6 +655,34 @@ void printCode() {
 	int i = 0;
 	for(i = 0; i < code.cx; i++) {
 
+		switch(code.inst[i].opcode){
+		case LIT:
+			printf("LIT");
+			break;
+		case OPR:
+			printf("OPR");
+			break;
+		case LOD:
+			printf("LOD");
+			break;
+		case STO:
+			printf("STO");
+			break;
+		case CAL:
+			printf("CAL");
+			break;
+		case INT:
+			printf("INT");
+			break;
+		case JMP:
+			printf("JMP");
+			break;
+		case JPC:
+			printf("JPC");
+			break;
+		}
+
+		printf(" %d, %d\n", code.inst[i].level, code.inst[i].disp);
 	}
 }
 
@@ -662,7 +703,7 @@ int main() {
 		}
 
 		printf("NO Error found\n");
-		print_symboltable();
+		printCode();
 	}
 
 	{
