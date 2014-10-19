@@ -599,7 +599,8 @@ void Block() {
 
 	level_up();
 
-	//SYMTAB.symtab[SYMTAB.tx].addr = code.cx;
+	if(SYMTAB.tx - 1 > 0)
+		SYMTAB.symtab[SYMTAB.tx - 1].addr = code.cx;
 	gen(JMP, 0, 0);
 
 	if( strcmp(token, "const") == 0 ) {
@@ -655,7 +656,8 @@ void Block() {
 	}
 
 	code.inst[SYMTAB.symtab[tx0].addr].disp = code.cx;
-	//SYMTAB.symtab[tx0].addr = code.cx;
+	if(tx0 - 1 > 0)
+		SYMTAB.symtab[tx0 -1].addr = code.cx;
 
 	cx0 = code.cx;
 	Statement();
