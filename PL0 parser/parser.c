@@ -17,7 +17,7 @@ typedef enum {
 	TYPE_IDENTIFIER,
 	TYPE_KEYWORD,
 	TYPE_NUMBER,
-	
+
 	TYPE_ASSIGN,
 	TYPE_GREATER_EQUAL,
 	TYPE_LESS_EQUAL,
@@ -27,16 +27,16 @@ typedef enum {
 	TYPE_MINUS = '-',
 	TYPE_MULTIPLY = '*',
 	TYPE_DIVIDE = '/',
-	
+
 	TYPE_COMMA = ',',
 	TYPE_EQUAL = '=',
 	TYPE_SEMICOLON = ';',
 	TYPE_PERIOD = '.',
-	
+
 	TYPE_COLON = ':',
 	TYPE_GREATER = '>',
 	TYPE_LESS = '<',
-	
+
 	TYPE_LPAREN = '(',
 	TYPE_RPAREN = ')',
 
@@ -123,8 +123,8 @@ Code		code;
 void print_symboltable() {
 
 	int i=0;
-	
-	
+
+
 	printf("\n=========================\n");
 	printf("<SYMTAB>\n");
 	printf("name | type | level | addr\n");
@@ -132,11 +132,11 @@ void print_symboltable() {
 	for(i = 0; i < SYMTAB.tx; i++)
 	{
 		printf("%5s %6s %7d %d\n",
-		SYMTAB.symtab[i].name,
-		get_type_string(SYMTAB.symtab[i].type),
-		SYMTAB.symtab[i].level,
-		SYMTAB.symtab[i].addr
-		);
+			SYMTAB.symtab[i].name,
+			get_type_string(SYMTAB.symtab[i].type),
+			SYMTAB.symtab[i].level,
+			SYMTAB.symtab[i].addr
+			);
 	}
 
 	printf("=========================\n");
@@ -150,9 +150,7 @@ void level_up() {
 }
 
 void level_down() {
-	
-	print_symboltable();
-
+	//print_symboltable();
 	{
 		int i;
 		for(i = SYMTAB.tx - 1; i >= 0; i--){
@@ -199,7 +197,7 @@ int FindSymbol(char * name) {
 
 void enter(char * name, SYMBOL_TYPE type, int addr) {
 
-	printf("enter : [%s]\n", name);
+	//printf("enter : [%s]\n", name);
 
 	if( FindSymbol(name) < 0 ) {
 		Symbol s;
@@ -213,7 +211,7 @@ void enter(char * name, SYMBOL_TYPE type, int addr) {
 			s.addr = dx[lev];
 			dx[lev]++;
 		}
-		
+
 		SYMTAB.symtab[SYMTAB.tx] = s;
 		SYMTAB.tx++;
 	}
@@ -234,7 +232,7 @@ int isSpecialChar(char c) {
 	if( c == '+' || c == '-' || c == '*' ||	c == '/' || c == ',' || 
 		c == '=' || c == ';' || c == '.' || c == '(' || c == ')' ||
 		c == ':' || c == '>' || c == '<') {
-		return TRUE;
+			return TRUE;
 	}
 	return FALSE;
 }
@@ -369,7 +367,7 @@ void Term() {
 	Factor();
 	while( type == TYPE_MULTIPLY || type == TYPE_DIVIDE ) {
 		TOKEN_TYPE mulop = type;
-		
+
 		NextToken();
 		Factor();
 
@@ -398,7 +396,7 @@ void Expression() {
 
 	while( type == TYPE_PLUS || type == TYPE_MINUS ) {
 		TOKEN_TYPE addop = type;
-		
+
 		NextToken();
 		Term();
 
@@ -425,10 +423,10 @@ void Condition() {
 			type != TYPE_LESS_EQUAL && 
 			type != TYPE_GREATER && 
 			type != TYPE_GREATER_EQUAL ) {
-			error(20);
+				error(20);
 		} else {
 			TOKEN_TYPE relop = type;
-			
+
 			NextToken();
 			Expression();
 
@@ -467,7 +465,7 @@ void Statement() {
 
 			int index = FindSymbol(token);
 			if(index >= 0 && SYMTAB.symtab[index].type == SYM_PROCEDURE){
-				
+
 				gen(CAL, lev - SYMTAB.symtab[index].level, SYMTAB.symtab[index].addr);
 
 			}else{
@@ -507,7 +505,7 @@ void Statement() {
 		} else {
 			error(17);
 		}
-		
+
 	} else if( strcmp("while", token) == 0 ) {
 		int cx1 = code.cx;
 		int cx2;
@@ -527,7 +525,7 @@ void Statement() {
 		Statement();
 		gen(JMP, 0, cx1);
 		code.inst[cx2].disp = code.cx;
-	
+
 	} else if( type == TYPE_IDENTIFIER ) {
 		// TODO : check if symbol alive
 		int index = FindSymbol(token);
@@ -652,7 +650,7 @@ void Block() {
 		}
 
 		Block();
-		
+
 		if( type == TYPE_SEMICOLON ) {
 			NextToken();
 		} else {
@@ -679,96 +677,61 @@ void Block() {
 	return ;
 }
 
-/* and other functions */
+/* interpreter */
 
-void SetUP() {
+void print_a_code(int p, Instruction* inst){
 
-	fp = fopen("input.txt", "r");
-	while( isspace(ch = fgetc(fp)) ){}
+	printf("[%3d] ", p);
 
-	SYMTAB.tx	= 0;
-	code.cx		= 0;
-}
+	switch(inst->opcode){
+	case LIT:
+		printf("LIT");
+		break;
+	case OPR:
+		printf("OPR");
+		break;
+	case LOD:
+		printf("LOD");
+		break;
+	case STO:
+		printf("STO");
+		break;
+	case CAL:
+		printf("CAL");
+		break;
+	case INT:
+		printf("INT");
+		break;
+	case JMP:
+		printf("JMP");
+		break;
+	case JPC:
+		printf("JPC");
+		break;
+	}
 
-void CleanUP() {
-
-	fclose(fp);
+	printf(" %d, %d\n", inst->level, inst->disp);
 }
 
 void printCode() {
 
 	int i = 0;
 
-	printf("<CODE>\n");
+	printf("\n<CODE>\n");
 
 	for(i = 0; i < code.cx; i++) {
-
-		printf("[%3d] ", i);
-
-		switch(code.inst[i].opcode){
-		case LIT:
-			printf("LIT");
-			break;
-		case OPR:
-			printf("OPR");
-			break;
-		case LOD:
-			printf("LOD");
-			break;
-		case STO:
-			printf("STO");
-			break;
-		case CAL:
-			printf("CAL");
-			break;
-		case INT:
-			printf("INT");
-			break;
-		case JMP:
-			printf("JMP");
-			break;
-		case JPC:
-			printf("JPC");
-			break;
-		}
-
-		printf(" %d, %d\n", code.inst[i].level, code.inst[i].disp);
+		print_a_code(i, &code.inst[i]);
 	}
 	printf("=================================\n");
 }
 
-void print_a_code(int p, Instruction inst){
-
-	printf("[%3d] ", p);
-
-	switch(inst.opcode){
-		case LIT:
-			printf("LIT");
-			break;
-		case OPR:
-			printf("OPR");
-			break;
-		case LOD:
-			printf("LOD");
-			break;
-		case STO:
-			printf("STO");
-			break;
-		case CAL:
-			printf("CAL");
-			break;
-		case INT:
-			printf("INT");
-			break;
-		case JMP:
-			printf("JMP");
-			break;
-		case JPC:
-			printf("JPC");
-			break;
-		}
-
-		printf(" %d, %d\n", inst.level, inst.disp);
+void print_stack(int *S, int t){
+	int i = 0;
+	printf("\n<Print Stack Trace>\n");
+	for(i = 1; i <= t; i++){
+		printf("[%d] %d\n", i, S[i]);
+	}
+	printf("=================================\n");
 }
 
 int base(int level, int * S, int b){
@@ -788,14 +751,13 @@ void interpret(){
 	int t = 0; // top
 	int b = 1; // base
 
+	// I won't use 0 index
 	S[0] = -1;
-	//S[0] = S[1] = S[2] = 0;
 
 	do{
 		Instruction inst = code.inst[p];
-		print_a_code(p, inst);
 		p = p + 1;
-		
+
 		if(p > code.cx){
 			printf("Force break\n");
 			break;
@@ -807,34 +769,30 @@ void interpret(){
 			S[t] = inst.disp;
 			break;
 		case OPR:
-			
+
 			switch(inst.disp){
 			case 0:
+				print_stack(S, t);
 				t = b - 1;
 				p = S[t+3];
 				b = S[t+2];
 				break;
 			case 1:
-				printf("\tunary - \n");
 				S[t] = -S[t];
 				break;
 			case 2:
-				printf("\t+\n");
 				t--;
 				S[t] = S[t] + S[t+1];
 				break;
 			case 3:
-				printf("\t-\n");
 				t--;
 				S[t] = S[t] - S[t+1];
 				break;
 			case 4:
-				printf("\t*\n");
 				t--;
 				S[t] = S[t] * S[t+1];
 				break;
 			case 5:
-				printf("\tdiv\n");
 				t--;
 				if(S[t+1] != 0)
 					S[t] = S[t] / S[t+1];
@@ -844,36 +802,29 @@ void interpret(){
 				}
 				break;
 			case 6:
-				printf("\todd\n");
 				S[t] = (S[t] % 2 == 0 ? 0 : 1);
 				break;
 			case 8:
-				printf("\t==\n");
 				t--;
 				S[t] = (S[t] == S[t+1]);
 				break;
 			case 9:
-				printf("\t!=\n");
 				t--;
 				S[t] = (S[t] != S[t+1]);
 				break;
 			case 10:
-				printf("\t<\n");
 				t--;
 				S[t] = (S[t] < S[t+1]);
 				break;
 			case 11:
-				printf("\t>=\n");
 				t--;
 				S[t] = (S[t] >= S[t+1]);
 				break;
 			case 12:
-				printf("\t>\n");
 				t--;
 				S[t] = (S[t] > S[t+1]);
 				break;
 			case 13:
-				printf("\t<=\n");
 				t--;
 				S[t] = (S[t] <= S[t+1]);
 				break;
@@ -888,16 +839,12 @@ void interpret(){
 			{
 				int bas = base(inst.level, S, b);
 				S[t] = S[bas + inst.disp];
-
-				printf("\t[%d]\n",S[t]);
 			}
 			break;
 		case STO:
 			{
 				int bas = base(inst.level, S, b);
 				S[bas + inst.disp] = S[t];
-
-				printf("\tS[%d] = %d\n", bas + inst.disp, S[bas + inst.disp]);
 			}
 			t--;
 			break;
@@ -927,13 +874,34 @@ void interpret(){
 
 	}while(p != 0);
 
-	printf("done?\n");
+	printf("execution done\n");
+}
+
+/* and other functions */
+
+int SetUP() {
+
+	if(fp = fopen("input.txt", "r")){
+		while( isspace(ch = fgetc(fp)) ){}
+
+		SYMTAB.tx	= 0;
+		code.cx		= 0;
+
+		return 0;
+	}else{
+		return -1;
+	}
+}
+
+void CleanUP() {
+	fclose(fp);
 }
 
 int main() {
-	
-	{
-		SetUP();
+
+	if(SetUP() < 0){
+		printf("no input file.\n");
+		return -1;
 	}
 
 	{
@@ -946,8 +914,8 @@ int main() {
 			error(9);
 		}
 
-		printf("NO Error found\n");
-		//printCode();
+		printf("Compile : NO Error found\n");
+		printCode();
 		interpret();
 	}
 
