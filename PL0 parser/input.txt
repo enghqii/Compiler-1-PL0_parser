@@ -29,7 +29,7 @@ end;
 procedure gcd;
 	var f,g;
 begin f := x; g := y;
-	while f <> q do
+	while f <> g do
 	begin
 		if f < g then g := g-f;
 		if g < f then f := f-g;

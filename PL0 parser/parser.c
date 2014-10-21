@@ -112,11 +112,11 @@ char		ch			= '\0';		/* current char */
 TOKEN_TYPE	type		= TYPE_NONE;
 char		token[128]	= "";
 int			num			= 0;
+int			lev			= 0;
+int			dx[MAX_LEVEL]= {0,};
 
 SymbolTable	SYMTAB;
 Code		code;
-
-int			lev = 0;
 
 /* code generation functions */
 
@@ -143,6 +143,9 @@ void print_symboltable() {
 }
 
 void level_up() {
+	if(lev + 1 > MAX_LEVEL){
+		// abort.
+	}
 	lev ++;
 }
 
@@ -205,16 +208,10 @@ void enter(char * name, SYMBOL_TYPE type, int addr) {
 		s.type	= type;
 		s.level = lev;
 		s.addr	= addr;
-		
+
 		if(type == SYM_VAR) {
-
-			Symbol before = SYMTAB.symtab[SYMTAB.tx - 1];
-
-			if(before.type == SYM_VAR){
-				s.addr = before.addr + 1;
-			}else{
-				s.addr = 0;
-			}
+			s.addr = dx[lev];
+			dx[lev]++;
 		}
 		
 		SYMTAB.symtab[SYMTAB.tx] = s;
@@ -495,12 +492,15 @@ void Statement() {
 		gen(JPC, 0, 0);
 
 		Statement();
+		code.inst[cx1].disp = code.cx;
 
 	} else if( strcmp("begin", token) == 0 ) {
 		do {
 			NextToken();
 			Statement();
 		} while(type == TYPE_SEMICOLON);
+
+		__asm{nop}
 
 		if( strcmp("end", token) == 0 ) {
 			NextToken();
@@ -584,7 +584,6 @@ void ConstDeclaration() {
 void VarDeclaration() {
 
 	if( type == TYPE_IDENTIFIER ) {
-		// TODO : enter
 		enter(token, SYM_VAR, -1);
 		NextToken();
 	} else {
@@ -592,16 +591,22 @@ void VarDeclaration() {
 	}
 }
 
+int mainAddr = 0;
+
 void Block() {
 	int cx0;
-	int dx = 3;
 	int tx0 = SYMTAB.tx;
 
 	level_up();
+	dx[lev] = 3;
 
-	if(SYMTAB.tx - 1 > 0)
-		SYMTAB.symtab[SYMTAB.tx - 1].addr = code.cx;
-	gen(JMP, 0, 0);
+
+	if(tx0 - 1 >= 0)
+		SYMTAB.symtab[tx0 - 1].addr = code.cx; // set proc addr to now code index
+	else
+		mainAddr = code.cx;
+
+	gen(JMP, 0, 0); // set disp later -- 1
 
 	if( strcmp(token, "const") == 0 ) {
 		do {
@@ -655,11 +660,17 @@ void Block() {
 		}
 	}
 
-	code.inst[SYMTAB.symtab[tx0].addr].disp = code.cx;
-	if(tx0 - 1 > 0)
+	if(tx0 - 1 >= 0){
+		code.inst[SYMTAB.symtab[tx0 -1].addr].disp = code.cx; // set JMP disp -- 1
 		SYMTAB.symtab[tx0 -1].addr = code.cx;
 
+	}else{
+		code.inst[mainAddr].disp = code.cx;
+		mainAddr = code.cx;
+	}
+
 	cx0 = code.cx;
+	gen(INT, 0, dx[lev]); // local var alloc
 	Statement();
 	gen(OPR, 0, 0);
 
@@ -692,6 +703,8 @@ void printCode() {
 
 	for(i = 0; i < code.cx; i++) {
 
+		printf("[%3d] ", i);
+
 		switch(code.inst[i].opcode){
 		case LIT:
 			printf("LIT");
@@ -721,6 +734,200 @@ void printCode() {
 
 		printf(" %d, %d\n", code.inst[i].level, code.inst[i].disp);
 	}
+	printf("=================================\n");
+}
+
+void print_a_code(int p, Instruction inst){
+
+	printf("[%3d] ", p);
+
+	switch(inst.opcode){
+		case LIT:
+			printf("LIT");
+			break;
+		case OPR:
+			printf("OPR");
+			break;
+		case LOD:
+			printf("LOD");
+			break;
+		case STO:
+			printf("STO");
+			break;
+		case CAL:
+			printf("CAL");
+			break;
+		case INT:
+			printf("INT");
+			break;
+		case JMP:
+			printf("JMP");
+			break;
+		case JPC:
+			printf("JPC");
+			break;
+		}
+
+		printf(" %d, %d\n", inst.level, inst.disp);
+}
+
+int base(int level, int * S, int b){
+	int b1 = b;
+
+	while(level > 0){
+		b1 = S[b1];
+		level--;
+	}
+	return b1;
+}
+
+void interpret(){
+
+	int S[512] = {0,};
+	int p = 0; // PC
+	int t = 0; // top
+	int b = 1; // base
+
+	S[0] = -1;
+	//S[0] = S[1] = S[2] = 0;
+
+	do{
+		Instruction inst = code.inst[p];
+		print_a_code(p, inst);
+		p = p + 1;
+		
+		if(p > code.cx){
+			printf("Force break\n");
+			break;
+		}
+
+		switch (inst.opcode){
+		case LIT:
+			t++;
+			S[t] = inst.disp;
+			break;
+		case OPR:
+			
+			switch(inst.disp){
+			case 0:
+				t = b - 1;
+				p = S[t+3];
+				b = S[t+2];
+				break;
+			case 1:
+				printf("\tunary - \n");
+				S[t] = -S[t];
+				break;
+			case 2:
+				printf("\t+\n");
+				t--;
+				S[t] = S[t] + S[t+1];
+				break;
+			case 3:
+				printf("\t-\n");
+				t--;
+				S[t] = S[t] - S[t+1];
+				break;
+			case 4:
+				printf("\t*\n");
+				t--;
+				S[t] = S[t] * S[t+1];
+				break;
+			case 5:
+				printf("\tdiv\n");
+				t--;
+				if(S[t+1] != 0)
+					S[t] = S[t] / S[t+1];
+				else{
+					printf("DIV by 0\n");
+					exit(-1);
+				}
+				break;
+			case 6:
+				printf("\todd\n");
+				S[t] = (S[t] % 2 == 0 ? 0 : 1);
+				break;
+			case 8:
+				printf("\t==\n");
+				t--;
+				S[t] = (S[t] == S[t+1]);
+				break;
+			case 9:
+				printf("\t!=\n");
+				t--;
+				S[t] = (S[t] != S[t+1]);
+				break;
+			case 10:
+				printf("\t<\n");
+				t--;
+				S[t] = (S[t] < S[t+1]);
+				break;
+			case 11:
+				printf("\t>=\n");
+				t--;
+				S[t] = (S[t] >= S[t+1]);
+				break;
+			case 12:
+				printf("\t>\n");
+				t--;
+				S[t] = (S[t] > S[t+1]);
+				break;
+			case 13:
+				printf("\t<=\n");
+				t--;
+				S[t] = (S[t] <= S[t+1]);
+				break;
+			default:
+				printf("Invalid OPR disp");
+				exit(-1);
+			}
+
+			break;
+		case LOD:
+			t++;
+			{
+				int bas = base(inst.level, S, b);
+				S[t] = S[bas + inst.disp];
+
+				printf("\t[%d]\n",S[t]);
+			}
+			break;
+		case STO:
+			{
+				int bas = base(inst.level, S, b);
+				S[bas + inst.disp] = S[t];
+
+				printf("\tS[%d] = %d\n", bas + inst.disp, S[bas + inst.disp]);
+			}
+			t--;
+			break;
+		case CAL:
+			S[t+1] = base(inst.level, S, b);
+			S[t+2] = b;
+			S[t+3] = p;
+			b = t+1;
+			p = inst.disp;
+			break;
+		case INT:
+			t = t + inst.disp;
+			break;
+		case JMP:
+			p = inst.disp;
+			break;
+		case JPC:
+			if(S[t] == 0){
+				p = inst.disp;
+			}
+			t--;
+			break;
+		default:
+			printf("Unknown opcode. abort.\n");
+			exit(-1);
+		}
+
+	}while(p != 0);
+
+	printf("done?\n");
 }
 
 int main() {
@@ -740,7 +947,8 @@ int main() {
 		}
 
 		printf("NO Error found\n");
-		printCode();
+		//printCode();
+		interpret();
 	}
 
 	{
