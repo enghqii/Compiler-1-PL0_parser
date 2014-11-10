@@ -4,55 +4,9 @@
 #include <ctype.h>
 //#include <stdbool.h>
 
-#define FALSE 0
-#define TRUE 1
-
-#define MAX_LEVEL 3		/* maximum depth of block nesting */
-#define MAX_CODE 200	/* size of code array */
-
-typedef enum {
-
-	TYPE_NONE = 0,
-
-	TYPE_IDENTIFIER,
-	TYPE_KEYWORD,
-	TYPE_NUMBER,
-
-	TYPE_ASSIGN,
-	TYPE_GREATER_EQUAL,
-	TYPE_LESS_EQUAL,
-	TYPE_NOT_EQUAL,
-
-	TYPE_PLUS = '+',
-	TYPE_MINUS = '-',
-	TYPE_MULTIPLY = '*',
-	TYPE_DIVIDE = '/',
-
-	TYPE_COMMA = ',',
-	TYPE_EQUAL = '=',
-	TYPE_SEMICOLON = ';',
-	TYPE_PERIOD = '.',
-
-	TYPE_COLON = ':',
-	TYPE_GREATER = '>',
-	TYPE_LESS = '<',
-
-	TYPE_LPAREN = '(',
-	TYPE_RPAREN = ')',
-
-	TYPE_OTHER,
-
-} TOKEN_TYPE;
+#include "parser.h"
 
 char keyWords[][10] = { "const", "var", "procedure", "call", "begin", "end", "if", "then", "while", "do", "odd"};
-
-/* SYMTAB */
-typedef enum {
-	SYM_NONE,
-	SYM_CONST,
-	SYM_VAR,
-	SYM_PROCEDURE,
-} SYMBOL_TYPE;
 
 char* get_type_string(SYMBOL_TYPE type) {
 
@@ -70,48 +24,16 @@ char* get_type_string(SYMBOL_TYPE type) {
 	}
 }
 
-typedef struct _Symbol {
-	char name[128];
-	SYMBOL_TYPE type;
-	int level;
-	int addr;
-} Symbol;
-
-typedef struct _SymbolTable {
-	int tx;
-	Symbol symtab[256];
-} SymbolTable;
-
-/* CODE */
-typedef enum {
-	LIT = 0,
-	OPR,
-	LOD,
-	STO,
-	CAL,
-	INT,
-	JMP,
-	JPC,
-} Operator;
-
-typedef struct _Instruction {
-	Operator	opcode;
-	int			level;
-	int			disp;
-} Instruction;
-
-typedef struct _Code {
-	int cx;							/* code allocation index */
-	Instruction inst[MAX_CODE];
-} Code;
-
 /* GLOBAL vars */
 FILE *		fp			= NULL;
-char		ch			= '\0';		/* current char */
+
+/* lex */
+extern int		yylex();
+extern FILE *	yyin;
+extern char		token[128];
+extern int		num;
 
 TOKEN_TYPE	type		= TYPE_NONE;
-char		token[128]	= "";
-int			num			= 0;
 int			lev			= 0;
 int			dx[MAX_LEVEL]= {0,};
 
@@ -123,8 +45,6 @@ Code		code;
 void print_symboltable() {
 
 	int i=0;
-
-
 	printf("\n=========================\n");
 	printf("<SYMTAB>\n");
 	printf("name | type | level | addr\n");
@@ -229,7 +149,7 @@ int isKeyWord(char * str) {
 }
 
 int isSpecialChar(char c) {
-	if( c == '+' || c == '-' || c == '*' ||	c == '/' || c == ',' || 
+	if( c == '+' || c == '-' || c == '*' || c == '/' || c == ',' ||
 		c == '=' || c == ';' || c == '.' || c == '(' || c == ')' ||
 		c == ':' || c == '>' || c == '<') {
 			return TRUE;
@@ -237,83 +157,41 @@ int isSpecialChar(char c) {
 	return FALSE;
 }
 
+/* has side effect on the 'token' and 'num'*/
 int NextToken() {
 
-	int tokenIndex = 0;
-	token[0] = '\0';
+	int i = yylex();
+	printf("now token is : [%s]", token);
 
-	if( isdigit(ch) ) {
-		while( isdigit(ch) ) {
-			token[tokenIndex++] = ch;
-			ch = fgetc(fp);
-		}
-		token[tokenIndex] = '\0';
-		num = atoi(token);
+	if( isdigit(token[0]) ){
 		type = TYPE_NUMBER;
 
-	} else if( isalpha(ch) ) {
-
-		while( isalpha(ch) || isdigit(ch) ) {
-			token[tokenIndex++] = ch;
-			ch = fgetc(fp);
-		}
-		token[tokenIndex] = '\0';
+	} else if ( isalpha(token[0]) ) { 
 
 		if(isKeyWord(token)) {
 			type = TYPE_KEYWORD;
-		}
-		else {
+		} else {
 			type = TYPE_IDENTIFIER;
 		}
 
-	} else if( isSpecialChar(ch) ) {
-		char before = ch;
-		token[0] = ch;
-		token[1] = '\0';
-		type = (TOKEN_TYPE)ch;
+	} else if( isSpecialChar(token[0]) ) {
 
-		ch = fgetc(fp);
+		type = (TOKEN_TYPE)token[0];
 
-		if( before == ':' && ch == '=' ) {
-			token[1] = ch;
-			token[2] = '\0';
+		if( strcmp(token, ":=") == 0 ) {
 			type = TYPE_ASSIGN;
-			ch = fgetc(fp);
-
-		} else if( before == '<' && ch == '=') {
-			token[1] = ch;
-			token[2] = '\0';
+		} else if ( strcmp(token, "<=") == 0 ) {
 			type = TYPE_LESS_EQUAL;
-			ch = fgetc(fp);
-
-		} else if( before == '>' && ch == '=') {
-			token[1] = ch;
-			token[2] = '\0';
+		} else if ( strcmp(token, "<=") == 0 ) {
 			type = TYPE_GREATER_EQUAL;
-			ch = fgetc(fp);
-		}
-		else if( before == '<' && ch == '>') {
-			token[1] = ch;
-			token[2] = '\0';
+		} else if ( strcmp(token, "<=") == 0 ) {
 			type = TYPE_NOT_EQUAL;
-			ch = fgetc(fp);
 		}
-
-	} else if(ch == EOF) {
-		return FALSE;
 
 	} else {
-		// A char i can't parse
-		printf("CH : %d(%c)\n", ch, ch);
 		type = TYPE_NONE;
-
-		ch = fgetc(fp);
 	}
 
-	/*printf("NEXT token : %s\n", token);*/
-
-	// eliminate white spaces
-	while( isspace(ch) ){ ch = fgetc(fp); }
 	return TRUE;
 }
 
@@ -882,7 +760,8 @@ void interpret(){
 int SetUP() {
 
 	if(fp = fopen("input.txt", "r")){
-		while( isspace(ch = fgetc(fp)) ){}
+		//while( isspace(ch = fgetc(fp)) ){}
+		yyin = fp;
 
 		SYMTAB.tx	= 0;
 		code.cx		= 0;
